@@ -1,0 +1,4 @@
+# Ignore the config we are running
+config.json
+# Ignore the autoresponses we are running
+autoresponse.json
