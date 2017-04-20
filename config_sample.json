@@ -1,7 +1,4 @@
 {
   "Token": "Discord-Bot-Token",
-  "Guild": "Your Guild ID",
-  "System": {
-    "Status": null
-  }
+  "Guild": "Your Guild ID"
 }
