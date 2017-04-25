@@ -11,27 +11,57 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+// VERSION of Vee, follows Symantic Versioning. (http://semver.org/)
+const VERSION = "0.1.0"
+
 var bot Object
 var start int64
 var err error
 
 func main() {
+	LogLevel = LogInformational
 
 	start = time.Now().UnixNano()
-	// Load the config.json file.
-	io, err := ioutil.ReadFile("config.json")
-	if err != nil {
-		fmt.Println(err)
+	// Show banner
+	bot.Banner()
+	// Check if config.json exists.
+	if _, err := os.Stat("config.json"); err == nil {
+		// Load the config.json file.
+		io, err := ioutil.ReadFile("config.json")
+		if err != nil {
+			veeLog(LogError, "%v", err)
+		}
+		// Load json into struct: Object
+		json.Unmarshal(io, &bot)
+		// Check token
+		err = CheckToken(bot.Token)
+		if err != nil {
+			veeLog(LogError, "%v", err)
+		}
+	} else {
+		// Start bot initiation sequence
+		veeLog(LogInformational, "No previous config found. Started Bot setup.")
+		bot.Init()
+		veeLog(LogInformational, "Setup done.")
 	}
-	// Load json into struct: Object
-	json.Unmarshal(io, &bot)
+	// Check if autoresponse.json exists.
+	if _, err := os.Stat("autoresponse.json"); err != nil {
+		veeLog(LogInformational, "No autorespone database found. Starting a new one.")
+		// Create the file.
+		ioutil.WriteFile("autoresponse.json", []byte("{}"), 0777)
+	}
 
 	// Login to discord. You can use a token or email, password arguments.
 	dg, err := discordgo.New("Bot " + bot.Token)
 	if err != nil {
-		fmt.Println(err)
+		//fmt.Println(err)
+		veeLog(LogError, "%v", err)
 		return
 	}
+
+	// Logging
+	dg.LogLevel = LogError
+
 	// Register new server
 	dg.AddHandler(bot.Initiate)
 	// Frostbyte Command handler.

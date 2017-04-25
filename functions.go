@@ -7,9 +7,13 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"os"
 	"time"
 
+	"strings"
+
 	"github.com/bwmarrin/discordgo"
+	input "github.com/vonEdfa/go-input"
 )
 
 // Random - Picks a random integer.
@@ -23,6 +27,21 @@ func Random(min, max int) int {
 		rand.Seed(time.Now().Unix())
 		return rand.Intn(max - min)
 	}
+}
+
+// CheckToken - Check to see if the given token exists.
+// token: The token of the bot we're trying to connect to
+func CheckToken(token string) error {
+	test, _ := discordgo.New("Bot " + token)
+	if _, err := test.User("@me"); err != nil {
+		test.Close()
+		return fmt.Errorf("Failed to find Bot. Is the token correct?")
+	}
+	err := test.Close()
+	if err != nil {
+		veeLog(LogWarning, "Failed to close test connection: %v", err)
+	}
+	return nil
 }
 
 // GetPageContents - Get page content based on URL.
@@ -53,6 +72,72 @@ func IsManager(s *discordgo.Session, GuildID string, AuthorID string) bool {
 		return false
 	}
 	return false
+}
+
+func (bot *Object) Init() {
+	ui := &input.UI{
+		Writer: os.Stdout,
+		Reader: os.Stdin,
+	}
+
+	fmt.Println(`---------------------------------------------`)
+	fmt.Printf("INSTALLING BOT\n")
+	fmt.Println(`---------------------------------------------`)
+	fmt.Printf("\nPlease fill in the below settings in order to complete setup.\nHINT: Go to https://discordapp.com/developers/applications/me to find your bot token.\n\n")
+
+	// Ask for Bot Token.
+	token, err := ui.Ask("Bot Token", &input.Options{
+		Required:    true,
+		Prefix:      "\t",
+		ErrSuffix:   "\n",
+		Loop:        true,
+		LoopOrder:   "Try Again",
+		HideOrder:   true,
+		HideDefault: true,
+		ValidateFunc: func(s string) error {
+			token := strings.Replace(s, "\r", "", -1)
+			if err := CheckToken(token); err != nil {
+				return fmt.Errorf("* %s", err)
+			}
+			return nil
+		},
+		HideValidateFuncErr: true,
+	})
+	if err != nil {
+		veeLog(LogWarning, "Input: %v", err)
+		veeLog(LogInformational, "Config aborted. Shutting down.")
+		//os.Exit(0)
+	}
+
+	// Ask for Guild ID.
+	guild1, err := ui.Ask("Guild/Server ID", &input.Options{
+		Required:    true,
+		Prefix:      "\t",
+		ErrSuffix:   "\n",
+		Loop:        true,
+		LoopOrder:   "Try Again",
+		HideOrder:   true,
+		HideDefault: true,
+	})
+	if err != nil {
+		veeLog(LogWarning, "Input: %v", err)
+		veeLog(LogInformational, "Config aborted. Shutting down.")
+		//os.Exit(0)
+	}
+
+	// Cleanup and set the token and guild ID we've recieved.
+	bot.Token = strings.Replace(token, "\r", "", -1)
+	bot.Guild = strings.Replace(guild1, "\r", "", -1)
+
+	// Save config.
+	if err == nil {
+		conf, err := json.MarshalIndent(bot, "", "  ")
+		if err != nil {
+			veeLog(LogError, "%v", err)
+		} else {
+			ioutil.WriteFile("config.json", conf, 0777)
+		}
+	}
 }
 
 // Save - Saves Database to config.json
@@ -213,19 +298,23 @@ func (bot *Object) RemoveStatus(message string) error {
 	return nil
 }
 
+// Banner - Displays the bot banner upon startup.
+func (bot *Object) Banner() {
+	fmt.Println(`
+ Y88b      /                     
+  Y88b    / e88~~8e   e88~~8e  
+   Y88b  / d888  88b d888  88b 
+    Y888/  8888__888 8888__888 
+     Y8/   Y888    , Y888    , 
+      Y     "88___/   "88___/ `)
+	fmt.Printf("\n Powered by Frostbyte and DiscordGo!\n Version: %v\n\n", VERSION)
+	<-time.After(2 * time.Second)
+}
+
 // Intro - Displays introduction and information on startup.
 func (bot *Object) Intro(s *discordgo.Session) {
 	var ars map[string]string
-	fmt.Println(`
-  ______             _   _           _       
- |  ____|           | | | |         | |      
- | |__ _ __ ___  ___| |_| |__  _   _| |_ ___ 
- |  __| '__/ _ \/ __| __| '_ \| | | | __/ _ \
- | |  | | | (_) \__ \ |_| |_) | |_| | ||  __/
- |_|  |_|  \___/|___/\__|_.__/ \__, |\__\___|
-                                __/ |        
-                               |___/         `)
-	<-time.After(2 * time.Second)
+	fmt.Println(`---------------------------------------------`)
 	// Collect some information and display it!
 	guild, err := s.State.Guild(bot.Guild)
 	if err != nil {
